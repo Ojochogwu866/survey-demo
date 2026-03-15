@@ -1,7 +1,7 @@
 import FeedbackSDK from '@product7/feedback-sdk';
 
 const API_URL = 'https://super-fortnight-be.onrender.com/api';
-const WORKSPACE = 'daystar';
+const WORKSPACE = 'zed';
 
 let currentUser = null;
 let feedbackSDK = null;
