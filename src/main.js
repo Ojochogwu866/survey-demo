@@ -38,8 +38,8 @@ function getProduct7BaseUrls() {
 function normalizeUserContext(user) {
   return {
     user_id: user?.user_id || user?.id || 'guest',
-    email: user?.email || '',
-    name: user?.name || 'Guest',
+    email:   user?.email   || '',
+    name:    user?.name    || 'Guest',
   };
 }
 
@@ -51,7 +51,6 @@ function showAuthModal() {
 
 function hideAuthModal() {
   document.getElementById('authModal').classList.remove('active');
-  // Reset password visibility when modal closes
   const passwordInput = document.getElementById('password');
   const eyeIcon = document.getElementById('eyeIcon');
   passwordInput.type = 'password';
@@ -93,7 +92,6 @@ function logout() {
   const btn = document.getElementById('authBtn');
   setButtonLoading(btn, true, 'Logging out...');
 
-  // Clear before destroy so SDK can't re-read its own keys during teardown
   localStorage.clear();
 
   destroySurveyWidget();
@@ -109,8 +107,6 @@ function logout() {
   }
   product7Initialized = false;
 
-  // Clear again in case destroy() wrote anything back synchronously,
-  // and once more on next tick for any async writes
   localStorage.clear();
   setTimeout(() => localStorage.clear(), 0);
   currentUser = null;
@@ -142,7 +138,7 @@ async function checkAndShowActiveSurvey() {
     {
       position:     'center',
       respondentId: currentUser.user_id || currentUser.id || null,
-      email:        currentUser.email || null,
+      email:        currentUser.email   || null,
       onSubmit:     () => destroySurveyWidget(),
       onDismiss:    () => destroySurveyWidget(),
     }
@@ -152,11 +148,17 @@ async function checkAndShowActiveSurvey() {
 // ── SDK init ─────────────────────────────────────────────────────────────────
 
 async function initializeSDK() {
-  if (!currentUser) return;
+  console.log('initializeSDK called', { currentUser, Product7 });
+
+  if (!currentUser) {
+    console.warn('initializeSDK: no currentUser, aborting');
+    return;
+  }
 
   currentUser = normalizeUserContext(currentUser);
 
   if (product7SDK && product7Initialized) {
+    console.log('initializeSDK: SDK already initialized, updating metadata');
     product7SDK.setMetadata(currentUser);
     await checkAndShowActiveSurvey();
     return;
@@ -164,35 +166,44 @@ async function initializeSDK() {
 
   const urls = getProduct7BaseUrls();
 
-  product7SDK = new Product7({
-    workspace: WORKSPACE,
-    metadata: currentUser,
-  });
+  try {
+    console.log('initializeSDK: creating Product7 instance...');
+    product7SDK = new Product7({
+      workspace: WORKSPACE,
+      metadata:  currentUser,
+    });
 
-  await product7SDK.init();
+    console.log('initializeSDK: calling product7SDK.init()...');
+    await product7SDK.init();
 
-  product7SDK.setMetadata(currentUser);
-  product7Initialized = true;
+    product7SDK.setMetadata(currentUser);
+    product7Initialized = true;
+    console.log('initializeSDK: SDK initialized successfully ✅');
 
-  product7SDK.on('survey:suppressed', (payload) => {
-    console.log('Survey suppressed:', payload);
-  });
+    product7SDK.on('survey:suppressed', (payload) => {
+      console.log('Survey suppressed:', payload);
+    });
 
-  messengerWidget = product7SDK.createWidget('messenger', {
-    position:        'bottom-left',
-    theme:           'light',
-    teamName:        'Product7 Support',
-    welcomeMessage:  'How can we help you today?',
-    enableHelp:      true,
-    enableChangelog: true,
-    feedbackUrl:     urls.feedbackUrl,
-    changelogUrl:    urls.changelogUrl,
-    helpUrl:         urls.helpUrl,
-    roadmapUrl:      urls.roadmapUrl,
-  });
-  messengerWidget.mount();
+    console.log('initializeSDK: mounting messenger widget...');
+    messengerWidget = product7SDK.createWidget('messenger', {
+      position:        'bottom-left',
+      theme:           'light',
+      teamName:        'Product7 Support',
+      welcomeMessage:  'How can we help you today?',
+      enableHelp:      true,
+      enableChangelog: true,
+      feedbackUrl:     urls.feedbackUrl,
+      changelogUrl:    urls.changelogUrl,
+      helpUrl:         urls.helpUrl,
+      roadmapUrl:      urls.roadmapUrl,
+    });
+    messengerWidget.mount();
+    console.log('initializeSDK: messenger widget mounted ✅');
 
-  await checkAndShowActiveSurvey();
+    await checkAndShowActiveSurvey();
+  } catch (err) {
+    console.error('❌ SDK init failed:', err);
+  }
 }
 
 // ── Auth check on load ────────────────────────────────────────────────────────
@@ -228,7 +239,7 @@ async function checkAuth() {
 
 // ── Password toggle SVG paths ─────────────────────────────────────────────────
 
-const EYE_OPEN_PATH  = `<path d="M247.31,124.76c-.35-.79-8.82-19.58-27.65-38.41C194.57,61.26,162.88,48,128,48S61.43,61.26,36.34,86.35C17.51,105.18,9,124,8.69,124.76a8,8,0,0,0,0,6.5c.35.79,8.82,19.57,27.65,38.4C61.43,194.74,93.12,208,128,208s66.57-13.26,91.66-38.34c18.83-18.83,27.3-37.61,27.65-38.4A8,8,0,0,0,247.31,124.76ZM128,192c-30.78,0-57.67-11.19-79.93-33.25A133.47,133.47,0,0,1,25,128,133.33,133.33,0,0,1,48.07,97.25C70.33,75.19,97.22,64,128,64s57.67,11.19,79.93,33.25A133.46,133.46,0,0,1,231.05,128C223.84,141.46,192.43,192,128,192Zm0-112a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Z" fill="currentColor"/>`;
+const EYE_OPEN_PATH   = `<path d="M247.31,124.76c-.35-.79-8.82-19.58-27.65-38.41C194.57,61.26,162.88,48,128,48S61.43,61.26,36.34,86.35C17.51,105.18,9,124,8.69,124.76a8,8,0,0,0,0,6.5c.35.79,8.82,19.57,27.65,38.4C61.43,194.74,93.12,208,128,208s66.57-13.26,91.66-38.34c18.83-18.83,27.3-37.61,27.65-38.4A8,8,0,0,0,247.31,124.76ZM128,192c-30.78,0-57.67-11.19-79.93-33.25A133.47,133.47,0,0,1,25,128,133.33,133.33,0,0,1,48.07,97.25C70.33,75.19,97.22,64,128,64s57.67,11.19,79.93,33.25A133.46,133.46,0,0,1,231.05,128C223.84,141.46,192.43,192,128,192Zm0-112a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Z" fill="currentColor"/>`;
 const EYE_CLOSED_PATH = `<path d="M228,175a8,8,0,0,1-10.92-3l-19-33.2A123.23,123.23,0,0,1,162,155.46l5.08,34.2a8,8,0,0,1-6.71,9.05A8.56,8.56,0,0,1,159,199a8,8,0,0,1-7.93-6.71l-5-33.65a124.29,124.29,0,0,1-36.06,0l-5,33.65A8,8,0,0,1,97,199a8.56,8.56,0,0,1-1.36-.12,8,8,0,0,1-6.71-9.05l5.08-34.2a123.23,123.23,0,0,1-36.06-16.69L39,172.06a8,8,0,1,1-13.94-7.94L45,132.78A140.62,140.62,0,0,1,29.09,111,8,8,0,0,1,43,103c12.19,18.16,31.1,39,85,39s72.83-20.86,85-39a8,8,0,1,1,13.9,8A140.62,140.62,0,0,1,211,132.78l19.94,32.28A8,8,0,0,1,228,175Z" fill="currentColor"/>`;
 
 // ── Event listeners ───────────────────────────────────────────────────────────
@@ -240,7 +251,6 @@ document.getElementById('authModal').addEventListener('click', (e) => {
   if (e.target.id === 'authModal') hideAuthModal();
 });
 
-// Password show/hide toggle
 document.getElementById('togglePassword').addEventListener('click', () => {
   const input   = document.getElementById('password');
   const eyeIcon = document.getElementById('eyeIcon');
@@ -250,7 +260,6 @@ document.getElementById('togglePassword').addEventListener('click', () => {
   document.getElementById('togglePassword').setAttribute('aria-label', showing ? 'Show password' : 'Hide password');
 });
 
-// Auth form submit
 document.getElementById('authForm').addEventListener('submit', async (e) => {
   e.preventDefault();
 
@@ -268,9 +277,9 @@ document.getElementById('authForm').addEventListener('submit', async (e) => {
 
   try {
     const response = await fetch(API_URL + endpoint, {
-      method: 'POST',
+      method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      body:    JSON.stringify(body),
     });
 
     const data = await response.json();
@@ -287,14 +296,14 @@ document.getElementById('authForm').addEventListener('submit', async (e) => {
     updateUI();
     hideAuthModal();
     await initializeSDK();
-  } catch {
+  } catch (err) {
+    console.error('Auth error:', err);
     errorMsg.textContent = 'Network error. Please try again.';
   } finally {
     setButtonLoading(submitBtn, false);
   }
 });
 
-// Add to cart buttons
 document.getElementById('btn-bananas').addEventListener('click', async () => {
   if (!currentUser) { showAuthModal(); return; }
   const btn = document.getElementById('btn-bananas');
