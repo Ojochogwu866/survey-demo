@@ -1,13 +1,14 @@
-import FeedbackSDK from '@product7/feedback-sdk';
+import Product7 from '@product7/product7-js';
 
 const API_URL = 'https://super-fortnight-be.onrender.com/api';
 const WORKSPACE = 'zed';
 
 let currentUser = null;
-let feedbackSDK = null;
+let product7SDK = null;
 let messengerWidget = null;
 let surveyWidget = null;
 let isLoginMode = true;
+let product7Initialized = false;
 
 // ── Button loading helpers ───────────────────────────────────────────────────
 
@@ -31,6 +32,14 @@ function getProduct7BaseUrls() {
     changelogUrl: `${base}/changelog`,
     helpUrl:      `${base}/help-docs`,
     roadmapUrl:   `${base}/roadmap`,
+  };
+}
+
+function normalizeUserContext(user) {
+  return {
+    user_id: user?.user_id || user?.id || 'guest',
+    email: user?.email || '',
+    name: user?.name || 'Guest',
   };
 }
 
@@ -65,8 +74,10 @@ function toggleAuthMode() {
 function updateUI() {
   document.getElementById('userInfo').textContent   = `Welcome, ${currentUser.name}`;
   document.getElementById('userInfo').style.display = 'block';
-  document.getElementById('authBtn').textContent    = 'Logout';
-  document.getElementById('authBtn').onclick        = logout;
+  const authBtn = document.getElementById('authBtn');
+  authBtn.disabled = false;
+  authBtn.textContent = 'Logout';
+  authBtn.onclick = logout;
 }
 
 // ── Widgets ──────────────────────────────────────────────────────────────────
@@ -92,10 +103,11 @@ function logout() {
     messengerWidget = null;
   }
 
-  if (feedbackSDK) {
-    feedbackSDK.destroy();
-    feedbackSDK = null;
+  if (product7SDK) {
+    product7SDK.destroy();
+    product7SDK = null;
   }
+  product7Initialized = false;
 
   // Clear again in case destroy() wrote anything back synchronously,
   // and once more on next tick for any async writes
@@ -112,11 +124,11 @@ function logout() {
 // ── Survey ───────────────────────────────────────────────────────────────────
 
 async function checkAndShowActiveSurvey() {
-  if (!feedbackSDK || !currentUser) return;
+  if (!product7SDK || !currentUser || !product7Initialized) return;
 
-  feedbackSDK.setUserContext(currentUser);
+  product7SDK.setMetadata(normalizeUserContext(currentUser));
 
-  const surveys = await feedbackSDK.getActiveSurveys({ includeEligibility: true });
+  const surveys = await product7SDK.getActiveSurveys({ includeEligibility: true });
 
   if (!Array.isArray(surveys) || surveys.length === 0) {
     destroySurveyWidget();
@@ -125,7 +137,7 @@ async function checkAndShowActiveSurvey() {
 
   destroySurveyWidget();
 
-  surveyWidget = await feedbackSDK.showSurveyById(
+  surveyWidget = await product7SDK.showSurveyById(
     surveys[0].id,
     {
       position:     'center',
@@ -140,25 +152,33 @@ async function checkAndShowActiveSurvey() {
 // ── SDK init ─────────────────────────────────────────────────────────────────
 
 async function initializeSDK() {
-  if (!currentUser || feedbackSDK) return;
+  if (!currentUser) return;
+
+  currentUser = normalizeUserContext(currentUser);
+
+  if (product7SDK && product7Initialized) {
+    product7SDK.setMetadata(currentUser);
+    await checkAndShowActiveSurvey();
+    return;
+  }
 
   const urls = getProduct7BaseUrls();
 
-  feedbackSDK = FeedbackSDK.create({
-    workspace:   WORKSPACE,
-    boardId:     WORKSPACE,
-    userContext: currentUser,
+  product7SDK = new Product7({
+    workspace: WORKSPACE,
+    metadata: currentUser,
   });
 
-  await feedbackSDK.init();
+  await product7SDK.init();
 
-  feedbackSDK.setUserContext(currentUser);
+  product7SDK.setMetadata(currentUser);
+  product7Initialized = true;
 
-  feedbackSDK.on('survey:suppressed', (payload) => {
+  product7SDK.on('survey:suppressed', (payload) => {
     console.log('Survey suppressed:', payload);
   });
 
-  messengerWidget = feedbackSDK.createWidget('messenger', {
+  messengerWidget = product7SDK.createWidget('messenger', {
     position:        'bottom-left',
     theme:           'light',
     teamName:        'Product7 Support',
@@ -191,7 +211,7 @@ async function checkAuth() {
 
     if (response.ok) {
       const data = await response.json();
-      currentUser = data.userContext;
+      currentUser = normalizeUserContext(data.userContext);
       updateUI();
       await initializeSDK();
     } else {
@@ -262,13 +282,14 @@ document.getElementById('authForm').addEventListener('submit', async (e) => {
     }
 
     localStorage.setItem('authToken', data.token);
-    currentUser = data.userContext;
+    currentUser = normalizeUserContext(data.userContext);
 
     updateUI();
     hideAuthModal();
     await initializeSDK();
   } catch {
     errorMsg.textContent = 'Network error. Please try again.';
+  } finally {
     setButtonLoading(submitBtn, false);
   }
 });
