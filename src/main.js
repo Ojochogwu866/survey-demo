@@ -134,7 +134,7 @@ async function checkAndShowActiveSurvey() {
   destroySurveyWidget();
 
   surveyWidget = await product7SDK.showSurveyById(
-    surveys[0].id,
+    surveys[0].surveyId,          // ← fixed: use normalized surveyId
     {
       position:     'center',
       respondentId: currentUser.user_id || currentUser.id || null,
@@ -188,7 +188,7 @@ async function initializeSDK() {
 
     console.log('initializeSDK: mounting messenger widget...');
     messengerWidget = product7SDK.createWidget('messenger', {
-      position:        'bottom-left',
+      position:        'right',
       theme:           'light',
       teamName:        'Product7 Support',
       welcomeMessage:  'How can we help you today?',
@@ -200,6 +200,21 @@ async function initializeSDK() {
       roadmapUrl:      urls.roadmapUrl,
     });
     messengerWidget.mount();
+
+    // Identify the user so the messenger skips the pre-chat form
+    try {
+      const identified = await product7SDK.apiService.identifyContact({
+        name:  currentUser.name,
+        email: currentUser.email,
+      });
+      if (identified?.status) {
+        messengerWidget.markAsIdentified(currentUser.name, currentUser.email);
+      }
+    } catch (e) {
+      // non-fatal — pre-chat form will handle identification
+      console.warn('initializeSDK: messenger identify failed, pre-chat form will be shown', e);
+    }
+
     console.log('initializeSDK: messenger widget mounted ✅');
 
     await checkAndShowActiveSurvey();
