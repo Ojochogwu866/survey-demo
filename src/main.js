@@ -1,4 +1,4 @@
-import Product7 from '@product7/product7-js';
+// Product7 is a named export — imported dynamically at init time
 
 const API_URL = 'https://super-fortnight-be.onrender.com/api';
 const WORKSPACE = 'zed';
@@ -167,8 +167,10 @@ async function initializeSDK() {
   const urls = getProduct7BaseUrls();
 
   try {
+    console.log('initializeSDK: importing Product7...');
+    const SDK = await import('@product7/product7-js');
     console.log('initializeSDK: creating Product7 instance...');
-    product7SDK = new Product7({
+    product7SDK = new SDK.Product7({
       workspace: WORKSPACE,
       metadata:  currentUser,
     });
