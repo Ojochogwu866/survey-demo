@@ -148,7 +148,7 @@ async function checkAndShowActiveSurvey() {
 // ── SDK init ─────────────────────────────────────────────────────────────────
 
 async function initializeSDK() {
-  console.log('initializeSDK called', { currentUser, Product7 });
+  console.log('initializeSDK called', { currentUser });
 
   if (!currentUser) {
     console.warn('initializeSDK: no currentUser, aborting');
