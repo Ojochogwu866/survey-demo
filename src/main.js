@@ -190,7 +190,6 @@ async function initializeSDK() {
     messengerWidget = product7SDK.createWidget('messenger', {
       position:        'right',
       theme:           'light',
-      teamName:        'Product7 Support',
       welcomeMessage:  'How can we help you today?',
       enableHelp:      true,
       enableChangelog: true,
