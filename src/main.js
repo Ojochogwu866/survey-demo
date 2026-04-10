@@ -122,8 +122,6 @@ function logout() {
 async function checkAndShowActiveSurvey() {
   if (!product7SDK || !currentUser || !product7Initialized) return;
 
-  product7SDK.setMetadata(normalizeUserContext(currentUser));
-
   const surveys = await product7SDK.getActiveSurveys({ includeEligibility: true });
 
   if (!Array.isArray(surveys) || surveys.length === 0) {
@@ -158,8 +156,8 @@ async function initializeSDK() {
   currentUser = normalizeUserContext(currentUser);
 
   if (product7SDK && product7Initialized) {
-    console.log('initializeSDK: SDK already initialized, updating metadata');
-    product7SDK.setMetadata(currentUser);
+    console.log('initializeSDK: SDK already initialized, updating identity');
+    await product7SDK.identify(currentUser);
     await checkAndShowActiveSurvey();
     return;
   }
@@ -170,15 +168,14 @@ async function initializeSDK() {
     console.log('initializeSDK: importing Product7...');
     const SDK = await import('@product7/product7-js');
     console.log('initializeSDK: creating Product7 instance...');
-    product7SDK = new SDK.Product7({
-      workspace: WORKSPACE,
-      metadata:  currentUser,
-    });
+    product7SDK = new SDK.Product7({ workspace: WORKSPACE });
 
     console.log('initializeSDK: calling product7SDK.init()...');
     await product7SDK.init();
 
-    product7SDK.setMetadata(currentUser);
+    // Identify the user — propagates to all mounted widgets via applyIdentity
+    await product7SDK.identify(currentUser);
+
     product7Initialized = true;
     console.log('initializeSDK: SDK initialized successfully ✅');
 
@@ -187,33 +184,19 @@ async function initializeSDK() {
     });
 
     console.log('initializeSDK: mounting messenger widget...');
-    messengerWidget = product7SDK.createWidget('messenger', {
-      position:        'right',
-      theme:           'light',
-      welcomeMessage:  'How can we help you today?',
-      enableHelp:      true,
-      enableChangelog: true,
-      feedbackUrl:     urls.feedbackUrl,
-      changelogUrl:    urls.changelogUrl,
-      helpUrl:         urls.helpUrl,
-      roadmapUrl:      urls.roadmapUrl,
+    messengerWidget = product7SDK.createMessengerWidget({
+      position:          'right',
+      theme:             'light',
+      welcomeMessage:    'How can we help you today?',
+      enableHelp:        true,
+      enableChangelog:   true,
+      feedbackBoardName: 'feature-requests',
+      feedbackUrl:       urls.feedbackUrl,
+      changelogUrl:      urls.changelogUrl,
+      helpUrl:           urls.helpUrl,
+      roadmapUrl:        urls.roadmapUrl,
     });
     messengerWidget.mount();
-
-    // Identify the user so the messenger skips the pre-chat form
-    try {
-      const identified = await product7SDK.apiService.identifyContact({
-        name:  currentUser.name,
-        email: currentUser.email,
-      });
-      if (identified?.status) {
-        messengerWidget.markAsIdentified(currentUser.name, currentUser.email);
-      }
-    } catch (e) {
-      // non-fatal — pre-chat form will handle identification
-      console.warn('initializeSDK: messenger identify failed, pre-chat form will be shown', e);
-    }
-
     console.log('initializeSDK: messenger widget mounted ✅');
 
     await checkAndShowActiveSurvey();
