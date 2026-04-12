@@ -36,11 +36,17 @@ function getProduct7BaseUrls() {
 }
 
 function normalizeUserContext(user) {
-  return {
+  const ctx = {
     user_id: user?.user_id || user?.id || 'guest',
     email:   user?.email   || '',
     name:    user?.name    || 'Guest',
   };
+
+  if (user?.avatar)     ctx.avatar     = user.avatar;
+  if (user?.attributes) ctx.attributes = user.attributes;
+  if (user?.company)    ctx.company    = user.company;
+
+  return ctx;
 }
 
 // ── Auth modal ───────────────────────────────────────────────────────────────
@@ -204,8 +210,6 @@ async function initializeSDK() {
     console.error('❌ SDK init failed:', err);
   }
 }
-
-// ── Auth check on load ────────────────────────────────────────────────────────
 
 async function checkAuth() {
   const token = localStorage.getItem('authToken');
