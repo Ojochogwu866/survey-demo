@@ -12,6 +12,6 @@
     "vite": "^7.3.1"
   },
   "dependencies": {
-    "@product7/product7-js": "^0.4.1"
+    "@product7/product7-js": "^0.4.2"
   }
 }
