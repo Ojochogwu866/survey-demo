@@ -42,9 +42,21 @@ function normalizeUserContext(user) {
     name:    user?.name    || 'Guest',
   };
 
-  if (user?.avatar)     ctx.avatar     = user.avatar;
-  if (user?.attributes) ctx.attributes = user.attributes;
-  if (user?.company)    ctx.company    = user.company;
+  if (user?.avatar) ctx.avatar = user.avatar;
+
+  const defaultAttributes = {
+    plan:          'free',
+    role:          'customer',
+    signup_source: 'web',
+    app_version:   '1.0.0',
+  };
+  ctx.attributes = { ...defaultAttributes, ...(user?.attributes || {}) };
+
+  ctx.company = {
+    name:          'Survey Demo Co',
+    monthly_spend: 49.99,
+    ...(user?.company || {}),
+  };
 
   return ctx;
 }
