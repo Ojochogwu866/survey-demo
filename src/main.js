@@ -1,7 +1,7 @@
 // Product7 is a named export — imported dynamically at init time
 
 const API_URL = 'https://super-fortnight-be.onrender.com/api';
-const WORKSPACE = 'zed';
+const WORKSPACE = 'zendora';
 
 let currentUser = null;
 let product7SDK = null;
