@@ -135,6 +135,8 @@ async function initSDK() {
       roadmapUrl:        urls.roadmapUrl,
     });
     messengerWidget.mount();
+
+    await checkAndShowActiveSurvey();
   } catch (err) {
     console.error('❌ SDK init failed:', err);
   }
