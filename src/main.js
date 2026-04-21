@@ -1,5 +1,3 @@
-// Product7 is a named export — imported dynamically at init time
-
 const API_URL = 'https://super-fortnight-be.onrender.com/api';
 const WORKSPACE = 'zendora';
 
@@ -44,13 +42,13 @@ function normalizeUserContext(user) {
 
   if (user?.avatar) ctx.avatar = user.avatar;
 
-  const defaultAttributes = {
+  ctx.attributes = {
     plan:          'free',
     role:          'customer',
     signup_source: 'web',
     app_version:   '1.0.0',
+    ...(user?.attributes || {}),
   };
-  ctx.attributes = { ...defaultAttributes, ...(user?.attributes || {}) };
 
   ctx.company = {
     name:          'Survey Demo Co',
@@ -106,102 +104,24 @@ function destroySurveyWidget() {
   }
 }
 
-function logout() {
-  const btn = document.getElementById('authBtn');
-  setButtonLoading(btn, true, 'Logging out...');
+// ── SDK init (runs on page load — no auth required) ──────────────────────────
 
-  localStorage.clear();
-
-  destroySurveyWidget();
-
-  if (messengerWidget) {
-    messengerWidget.destroy();
-    messengerWidget = null;
-  }
-
-  if (product7SDK) {
-    product7SDK.destroy();
-    product7SDK = null;
-  }
-  product7Initialized = false;
-
-  localStorage.clear();
-  setTimeout(() => localStorage.clear(), 0);
-  currentUser = null;
-
-  document.getElementById('userInfo').style.display = 'none';
-  btn.disabled = false;
-  btn.textContent = 'Sign In';
-  btn.onclick = showAuthModal;
-}
-
-// ── Survey ───────────────────────────────────────────────────────────────────
-
-async function checkAndShowActiveSurvey() {
-  if (!product7SDK || !currentUser || !product7Initialized) return;
-
-  const surveys = await product7SDK.getActiveSurveys({ includeEligibility: true });
-
-  if (!Array.isArray(surveys) || surveys.length === 0) {
-    destroySurveyWidget();
-    return;
-  }
-
-  destroySurveyWidget();
-
-  surveyWidget = await product7SDK.showSurveyById(
-    surveys[0].surveyId,          // ← fixed: use normalized surveyId
-    {
-      position:     'center',
-      respondentId: currentUser.user_id || currentUser.id || null,
-      email:        currentUser.email   || null,
-      onSubmit:     () => destroySurveyWidget(),
-      onDismiss:    () => destroySurveyWidget(),
-    }
-  );
-}
-
-// ── SDK init ─────────────────────────────────────────────────────────────────
-
-async function initializeSDK() {
-  console.log('initializeSDK called', { currentUser });
-
-  if (!currentUser) {
-    console.warn('initializeSDK: no currentUser, aborting');
-    return;
-  }
-
-  currentUser = normalizeUserContext(currentUser);
-
-  if (product7SDK && product7Initialized) {
-    console.log('initializeSDK: SDK already initialized, updating identity');
-    await product7SDK.identify(currentUser);
-    await checkAndShowActiveSurvey();
-    return;
-  }
+async function initSDK() {
+  if (product7SDK && product7Initialized) return;
 
   const urls = getProduct7BaseUrls();
 
   try {
-    console.log('initializeSDK: importing Product7...');
     const SDK = await import('@product7/product7-js');
-    console.log('initializeSDK: creating Product7 instance...');
     product7SDK = new SDK.Product7({ workspace: WORKSPACE });
 
-    console.log('initializeSDK: calling product7SDK.init()...');
     await product7SDK.init();
-
-    // Identify the user — propagates to all mounted widgets via applyIdentity
-    await product7SDK.identify(currentUser);
-
     product7Initialized = true;
-    console.log('initializeSDK: SDK initialized successfully ✅');
 
     product7SDK.on('survey:suppressed', (payload) => {
       console.log('Survey suppressed:', payload);
     });
 
-    console.log('initializeSDK: mounting messenger widget...');
     messengerWidget = product7SDK.createMessengerWidget({
       position:          'right',
       theme:             'light',
@@ -215,15 +135,82 @@ async function initializeSDK() {
       roadmapUrl:        urls.roadmapUrl,
     });
     messengerWidget.mount();
-    console.log('initializeSDK: messenger widget mounted ✅');
-
-    await checkAndShowActiveSurvey();
   } catch (err) {
     console.error('❌ SDK init failed:', err);
   }
 }
 
+// ── Identify (only called when user is authenticated) ────────────────────────
+
+async function identifyUser(user) {
+  if (!product7SDK || !product7Initialized) return;
+  try {
+    await product7SDK.identify(user);
+  } catch (err) {
+    console.error('❌ identify failed:', err);
+  }
+}
+
+// ── Survey ───────────────────────────────────────────────────────────────────
+
+async function checkAndShowActiveSurvey() {
+  if (!product7SDK || !product7Initialized) return;
+
+  const surveys = await product7SDK.getActiveSurveys({ includeEligibility: true });
+
+  if (!Array.isArray(surveys) || surveys.length === 0) {
+    destroySurveyWidget();
+    return;
+  }
+
+  destroySurveyWidget();
+
+  surveyWidget = await product7SDK.showSurveyById(
+    surveys[0].surveyId,
+    {
+      position:     'center',
+      respondentId: currentUser?.user_id || currentUser?.id || null,
+      email:        currentUser?.email   || null,
+      onSubmit:     () => destroySurveyWidget(),
+      onDismiss:    () => destroySurveyWidget(),
+    }
+  );
+}
+
+// ── Logout ───────────────────────────────────────────────────────────────────
+
+async function logout() {
+  const btn = document.getElementById('authBtn');
+  setButtonLoading(btn, true, 'Logging out...');
+
+  localStorage.clear();
+  destroySurveyWidget();
+
+  // Tear down the current SDK session (identity + session token)
+  // then re-init so the widgets keep working anonymously
+  if (product7SDK) {
+    product7SDK.destroy();
+    product7SDK = null;
+    messengerWidget = null;
+  }
+  product7Initialized = false;
+  currentUser = null;
+
+  document.getElementById('userInfo').style.display = 'none';
+  btn.disabled = false;
+  btn.textContent = 'Sign In';
+  btn.onclick = showAuthModal;
+
+  // Re-init SDK so messenger / feedback still work for anonymous visitors
+  await initSDK();
+}
+
+// ── Auth check on page load ───────────────────────────────────────────────────
+
 async function checkAuth() {
+  // Always boot the SDK so anonymous visitors get full widget functionality
+  await initSDK();
+
   const token = localStorage.getItem('authToken');
   if (!token) return;
 
@@ -239,7 +226,8 @@ async function checkAuth() {
       const data = await response.json();
       currentUser = normalizeUserContext(data.userContext);
       updateUI();
-      await initializeSDK();
+      await identifyUser(currentUser);
+      await checkAndShowActiveSurvey();
     } else {
       localStorage.removeItem('authToken');
       btn.disabled = false;
@@ -310,7 +298,10 @@ document.getElementById('authForm').addEventListener('submit', async (e) => {
 
     updateUI();
     hideAuthModal();
-    await initializeSDK();
+
+    // SDK already running — just identify and check surveys
+    await identifyUser(currentUser);
+    await checkAndShowActiveSurvey();
   } catch (err) {
     console.error('Auth error:', err);
     errorMsg.textContent = 'Network error. Please try again.';
