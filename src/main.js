@@ -104,25 +104,30 @@ function destroySurveyWidget() {
   }
 }
 
-// ── SDK init (runs on page load — no auth required) ──────────────────────────
+// ── SDK init — only initializes the session, nothing else ────────────────────
 
 async function initSDK() {
   if (product7SDK && product7Initialized) return;
-
-  const urls = getProduct7BaseUrls();
-
   try {
     const SDK = await import('@product7/product7-js');
     product7SDK = new SDK.Product7({ workspace: WORKSPACE });
-
     await product7SDK.init();
     product7Initialized = true;
-
     product7SDK.on('survey:suppressed', (payload) => {
       console.log('Survey suppressed:', payload);
     });
+  } catch (err) {
+    console.error('❌ SDK init failed:', err);
+  }
+}
 
-    webChatWidget = product7SDK.createwebChatWidget({
+// ── Mount widgets — called after identify (or anonymously if no user) ─────────
+
+async function mountWidgets() {
+  if (!product7SDK || !product7Initialized || webChatWidget) return;
+  const urls = getProduct7BaseUrls();
+  try {
+    webChatWidget = product7SDK.createWebChatWidget({
       position:          'right',
       theme:             'light',
       welcomeMessage:    'How can we help you today?',
@@ -135,10 +140,8 @@ async function initSDK() {
       roadmapUrl:        urls.roadmapUrl,
     });
     webChatWidget.mount();
-
-    await checkAndShowActiveSurvey();
   } catch (err) {
-    console.error('❌ SDK init failed:', err);
+    console.error('❌ Widget mount failed:', err);
   }
 }
 
@@ -203,43 +206,45 @@ async function logout() {
   btn.textContent = 'Sign In';
   btn.onclick = showAuthModal;
 
-  // Re-init SDK so web chat / feedback still work for anonymous visitors
+  // Re-init SDK anonymously so web chat / feedback still work
   await initSDK();
+  await mountWidgets();
+  await checkAndShowActiveSurvey();
 }
 
 // ── Auth check on page load ───────────────────────────────────────────────────
 
 async function checkAuth() {
-  // Always boot the SDK so anonymous visitors get full widget functionality
   await initSDK();
 
   const token = localStorage.getItem('authToken');
-  if (!token) return;
-
-  const btn = document.getElementById('authBtn');
-  setButtonLoading(btn, true, 'Loading...');
-
-  try {
-    const response = await fetch(API_URL + '/me', {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      currentUser = normalizeUserContext(data.userContext);
-      updateUI();
-      await identifyUser(currentUser);
-      await checkAndShowActiveSurvey();
-    } else {
+  if (token) {
+    const btn = document.getElementById('authBtn');
+    setButtonLoading(btn, true, 'Loading...');
+    try {
+      const response = await fetch(API_URL + '/me', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        currentUser = normalizeUserContext(data.userContext);
+        updateUI();
+        await identifyUser(currentUser);
+      } else {
+        localStorage.removeItem('authToken');
+        btn.disabled = false;
+        btn.textContent = 'Sign In';
+      }
+    } catch {
       localStorage.removeItem('authToken');
       btn.disabled = false;
       btn.textContent = 'Sign In';
     }
-  } catch {
-    localStorage.removeItem('authToken');
-    btn.disabled = false;
-    btn.textContent = 'Sign In';
   }
+
+  // mount widgets and check surveys after identify (or anonymously if no user)
+  await mountWidgets();
+  await checkAndShowActiveSurvey();
 }
 
 // ── Password toggle SVG paths ─────────────────────────────────────────────────
