@@ -1,9 +1,9 @@
-const API_URL = 'https://super-fortnight-be.onrender.com/api';
+﻿const API_URL = 'https://super-fortnight-be.onrender.com/api';
 const WORKSPACE = 'zendora';
 
 let currentUser = null;
 let product7SDK = null;
-let messengerWidget = null;
+let webChatWidget = null;
 let surveyWidget = null;
 let isLoginMode = true;
 let product7Initialized = false;
@@ -122,7 +122,7 @@ async function initSDK() {
       console.log('Survey suppressed:', payload);
     });
 
-    messengerWidget = product7SDK.createMessengerWidget({
+    webChatWidget = product7SDK.createwebChatWidget({
       position:          'right',
       theme:             'light',
       welcomeMessage:    'How can we help you today?',
@@ -134,7 +134,7 @@ async function initSDK() {
       helpUrl:           urls.helpUrl,
       roadmapUrl:        urls.roadmapUrl,
     });
-    messengerWidget.mount();
+    webChatWidget.mount();
 
     await checkAndShowActiveSurvey();
   } catch (err) {
@@ -193,7 +193,7 @@ async function logout() {
   if (product7SDK) {
     product7SDK.destroy();
     product7SDK = null;
-    messengerWidget = null;
+    webChatWidget = null;
   }
   product7Initialized = false;
   currentUser = null;
@@ -203,7 +203,7 @@ async function logout() {
   btn.textContent = 'Sign In';
   btn.onclick = showAuthModal;
 
-  // Re-init SDK so messenger / feedback still work for anonymous visitors
+  // Re-init SDK so web chat / feedback still work for anonymous visitors
   await initSDK();
 }
 
