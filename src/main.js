@@ -127,7 +127,7 @@ async function mountWidgets() {
   if (!product7SDK || !product7Initialized || liveChatWidget) return;
   const urls = getProduct7BaseUrls();
   try {
-    liveChatWidget = product7SDK.createliveChatWidget({
+    liveChatWidget = product7SDK.createLiveChatWidget({
       position:          'right',
       theme:             'light',
       welcomeMessage:    'How can we help you today?',
