@@ -3,7 +3,7 @@ const WORKSPACE = 'zendora';
 
 let currentUser = null;
 let product7SDK = null;
-let webChatWidget = null;
+let liveChatWidget = null;
 let surveyWidget = null;
 let isLoginMode = true;
 let product7Initialized = false;
@@ -124,10 +124,10 @@ async function initSDK() {
 // ── Mount widgets — called after identify (or anonymously if no user) ─────────
 
 async function mountWidgets() {
-  if (!product7SDK || !product7Initialized || webChatWidget) return;
+  if (!product7SDK || !product7Initialized || liveChatWidget) return;
   const urls = getProduct7BaseUrls();
   try {
-    webChatWidget = product7SDK.createWebChatWidget({
+    liveChatWidget = product7SDK.createliveChatWidget({
       position:          'right',
       theme:             'light',
       welcomeMessage:    'How can we help you today?',
@@ -139,7 +139,7 @@ async function mountWidgets() {
       helpUrl:           urls.helpUrl,
       roadmapUrl:        urls.roadmapUrl,
     });
-    webChatWidget.mount();
+    liveChatWidget.mount();
   } catch (err) {
     console.error('❌ Widget mount failed:', err);
   }
@@ -196,7 +196,7 @@ async function logout() {
   if (product7SDK) {
     product7SDK.destroy();
     product7SDK = null;
-    webChatWidget = null;
+    liveChatWidget = null;
   }
   product7Initialized = false;
   currentUser = null;
@@ -336,3 +336,4 @@ document.getElementById('btn-apples').addEventListener('click', async () => {
 });
 
 checkAuth();
+
