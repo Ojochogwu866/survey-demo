@@ -1,5 +1,5 @@
 ﻿const API_URL = 'https://super-fortnight-be.onrender.com/api';
-const WORKSPACE = 'zendora';
+const WORKSPACE = 'daystar';
 
 let currentUser = null;
 let product7SDK = null;
